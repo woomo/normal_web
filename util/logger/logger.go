@@ -144,3 +144,8 @@ func Error(format string, v ...any) {
 		errorLogger.Printf(addPrefix()+" "+format, v...)
 	}
 }
+
+func Fatalf(format string, v ...any) {
+	checkAndChangeLogFile()
+	errorLogger.Fatalf(addPrefix()+" "+format, v...)
+}

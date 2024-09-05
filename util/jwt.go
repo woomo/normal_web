@@ -1,0 +1,87 @@
+package util
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
+var (
+	defaultHeader = JWTHeader{
+		Algo: "HS256",
+		Type: "JWT",
+	}
+)
+
+type JWTHeader struct {
+	Algo string `json:"alg"`
+	Type string `json:"typ"`
+}
+
+type JWTPayload struct {
+	ID          string         `json:"jti"` //JWT ID用于标识该JWT
+	Issue       string         `json:"iss"` //发行人。比如微信
+	Audience    string         `json:"aud"` //受众人。比如王者荣耀
+	Subject     string         `json:"sub"` //主题
+	IssueAt     int64          `json:"iat"` //发布时间,精确到秒
+	NotBefore   int64          `json:"nbf"` //在此之前不可用,精确到秒
+	Expiration  int64          `json:"exp"` //到期时间,精确到秒
+	UserDefined map[string]any `json:"ud"`  //用户自定义的其他字段
+}
+
+func GenerateJWT(header JWTHeader, payload JWTPayload, secret string) (string, error) {
+	var part1, part2, signature string
+
+	if bs1, err := json.Marshal(header); err != nil {
+		part1 = base64.RawURLEncoding.EncodeToString(bs1)
+	} else {
+		return "", err
+	}
+
+	if bs2, err := json.Marshal(payload); err != nil {
+		part2 = base64.RawURLEncoding.EncodeToString(bs2)
+	}
+
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(part1 + "." + part2))
+	signature = base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
+	return part1 + "." + part2 + "." + signature, nil
+}
+
+func VerifyJWT(token string, secret string) (*JWTHeader, *JWTPayload, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, nil, fmt.Errorf("token 是%d部分", len(parts))
+	}
+
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(parts[0] + "." + parts[1]))
+	signature := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
+	if signature != parts[2] {
+		return nil, nil, fmt.Errorf("验证失败")
+	}
+
+	var part1, part2 []byte
+	var err error
+	if part1, err = base64.RawURLEncoding.DecodeString(parts[0]); err != nil {
+		return nil, nil, fmt.Errorf("header Base64反解失败")
+	}
+	if part2, err = base64.RawURLEncoding.DecodeString(parts[1]); err != nil {
+		return nil, nil, fmt.Errorf("payload Base64反解失败")
+	}
+
+	var header JWTHeader
+	var payload JWTPayload
+	if err = json.Unmarshal(part1, &header); err != nil {
+		return nil, nil, fmt.Errorf("header json反解失败")
+	}
+	if err = json.Unmarshal(part2, &payload); err != nil {
+		return nil, nil, fmt.Errorf("payload json反解失败")
+	}
+	return &header, &payload, nil
+}
