@@ -13,11 +13,11 @@ const (
 )
 
 var (
-	appConf = util.CreateConfig("app")
+	AppConf = util.CreateConfig("app")
 )
 
 func GetUidFromJWT(token string) int {
-	_, payload, err := util.VerifyJWT(token, appConf.GetString("jwt"))
+	_, payload, err := util.VerifyJWT(token, AppConf.GetString("jwt"))
 	if err != nil {
 		return 0
 	}
